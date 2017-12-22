@@ -1,0 +1,15 @@
+{
+  "name": "Router",
+  "version": "1.0.0",
+  "main": "Router.js",
+  "dependencies": {
+    "lodash": "^4.17.4",
+    "path-to-regexp": "^2.1.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DAC098/Router.git"
+  },
+  "author": "David Cathers",
+  "license": "MIT"
+}

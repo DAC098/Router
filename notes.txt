@@ -1,0 +1,23 @@
+types of routes
+ - route: routes will handle middleware routes and endpoints (get,post,put,etc...)
+ - mount: mounts will handle nesting Routers to the currently specified router
+
+route properties:
+    methods: [Map[Object]] contains the http methods that the route will handle
+        middleware: [Array[Function]] contains the middleware that is specific to the specified http method
+        final: [Function] the final method to run for the http method, if given then the route will be considered handled
+    path: [String] the path string given to the route
+    regex: [RegExp] the regular expression that will be used to test if the route should be run
+    keys: [Array[Object]] the key mapping for the regular expression
+    middleware: [Array[Function]] the middleware function that will be run regardless of the http method
+    type: [String] the type of the route, currently: endpt, mdlwr
+
+mount properties:
+    path: [String] the mount path given to the router
+    regex: [RegExp] the regular express that will be used to test if the mount should be run
+    keys: [Array] the regular express will be basic and will not use keys
+    middleware: [Array[Function]] the middleware functions that will be run before the router
+    router: [Router] the nested Router instance to run,
+    type: [String] the type of the mount, currently: mount
+
+
