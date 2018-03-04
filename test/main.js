@@ -51,19 +51,19 @@ console.log('router\n' + global.routerStructure(r1,null));
 
 (async () => {
 	try {
-		let rtn = await r1.run({},{':method':'get',':path':'/path/to/place'});
+		let rtn = await r1.run({'method':'get','url':'/path/to/place'},{});
 		console.log('rtn',rtn);
 	} catch(err) {
 		console.log(err.stack);
 	}
 	try {
-		let rtn = await r1.run({},{':method':'post',':path':'/path/to/place'});
+		let rtn = await r1.run({'method':'post','url':'/path/to/place'},{});
 		console.log('rtn',rtn);
 	} catch(err) {
 		console.log(err.stack);
 	}
 	try {
-		let rtn = await r1.run({},{':method':'get',':path':'/other/some/place'});
+		let rtn = await r1.run({'method':'get','url':'/other/some/place'},{});
 		console.log('rtn',rtn);
 	} catch(err) {
 		console.log(err.stack);
