@@ -50,19 +50,28 @@ r2.get('/some/place',() => {
 console.log('router\n' + global.routerStructure(r1,null));
 
 (async () => {
+	console.log('\ntest one----------');
 	try {
+		let run = {'method':'get','url':'/path/to/place'};
+		console.log('find',run);
 		let rtn = await r1.run({'method':'get','url':'/path/to/place'},{});
 		console.log('rtn',rtn);
 	} catch(err) {
 		console.log(err.stack);
 	}
+	console.log('\ntest two----------');
 	try {
+		let run = {'method':'post','url':'/path/to/place'};
+		console.log('find',run);
 		let rtn = await r1.run({'method':'post','url':'/path/to/place'},{});
 		console.log('rtn',rtn);
 	} catch(err) {
 		console.log(err.stack);
 	}
+	console.log('\ntest three--------');
 	try {
+		let run = {'method':'get','url':'/other/some/place'};
+		console.log('find',run);
 		let rtn = await r1.run({'method':'get','url':'/other/some/place'},{});
 		console.log('rtn',rtn);
 	} catch(err) {
