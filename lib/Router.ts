@@ -5,11 +5,11 @@ import _ from "lodash";
 
 type CallableTypeReturn = boolean | void;
 
-interface Callback<T extends any[]> {
+export interface Callback<T extends any[]> {
 	(args: T, params?: ParamsObject):  CallableTypeReturn | Promise<CallableTypeReturn>
 }
 
-interface RouteOptions {
+export interface RouteOptions {
 	path: string,
 	name?: string,
 	methods?: string | string[],
@@ -18,7 +18,7 @@ interface RouteOptions {
 	regex?: RegExp
 };
 
-interface MountOptions {
+export interface MountOptions {
 	path?: string,
 	name?: string,
 	options?: pathToRegexp.ParseOptions,
@@ -39,20 +39,20 @@ interface MethodContainer<T extends any[]> {
 	final?: Callback<T>
 }
 
-interface Route<T extends any[]> extends RouteBase<T> {
+export interface Route<T extends any[]> extends RouteBase<T> {
 	methods: Map<string, MethodContainer<T>>
 }
 
-interface Mount<T extends any[]> extends RouteBase<T> {
+export interface Mount<T extends any[]> extends RouteBase<T> {
 	router: Router<T>
 }
 
-interface RouterOptions {
+export interface RouterOptions {
 	methods?: string[],
 	name?: string
 }
 
-interface RouterRunResult {
+export interface RouterRunResult {
 	found_path: boolean,
 	valid_method: boolean
 }
