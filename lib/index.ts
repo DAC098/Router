@@ -1,5 +1,6 @@
 export {
 	default as default,
+	Callback,
 	RouterOptions, RouterRunResult,
 	Route, RouteOptions,
 	Mount, MountOptions
