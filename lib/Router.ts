@@ -202,6 +202,8 @@ class Router<T extends any[]> {
 
 			await Promise.resolve(method_opts.final(passing, params));
 		}
+
+		return rtn;
 	}
 
 	private async handleMount(

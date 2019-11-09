@@ -106,6 +106,7 @@ class Router {
             }
             await Promise.resolve(method_opts.final(passing, params));
         }
+        return rtn;
     }
     async handleMount(mount, url, method, passing, params) {
         for (let mid of mount.middleware) {
