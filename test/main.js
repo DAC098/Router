@@ -1,80 +1,146 @@
-const Router = require('../index');
-const global = require('../global');
+const http2 = require("http2");
 
-global.on('addRoute',(router,key) => {
-	console.log('route added',router.name,key);
-});
+function resStream(stream, status, message = "okay") {
+	stream.respond({
+		":status": status,
+		"content-type": "text/plain"
+	});
+	stream.end(message);
+}
 
-global.on('addMount',(router,key) => {
-	console.log('mount added',router.name,key);
-});
+async function main() {
+	const Router = (await import("../dist/Router.js")).default;
+	const router = new Router();
 
-global.on('endpoint',(router,k) => {
-	console.log('running endpoint',router.name,k);
-});
+	router.addRoute({
+		path: "/",
+		methods: "get"
+	},([stream,headers,flags],route_data) => {
+		resStream(stream,200);
+	});
 
-global.on('middleware',(router,k) => {
-	console.log('running middleware',router.name,k);
-});
+	router.addRoute({
+		path: "/root",
+		methods: ["get","post"]
+	},([stream,headers,flags],route_data) => {
+		resStream(stream,200);
+	});
 
-global.on('mount',(router,k) => {
-	console.log('running mount',router.name,k);
-});
+	router.addRoute({
+		path: "/api",
+		methods: "get",
+		options: {
+			end: false
+		}
+	},([stream,headers,flags],route_data) => {
+		resStream(stream,200);
+	});
 
-const r1 = new Router();
-const r2 = new Router();
-const r3 = new Router();
+	router.addRoute({
+		path: "/id/:id?",
+		methods: ["get","post"],
+	}, ([stream,headers,flags],route_data) => {
+		resStream(
+			stream,
+			200,
+			`${route_data.params["id"]}`
+		);
+	});
 
-r1.use(() => {
-	console.log('catch all middleware');
-});
+	let nested_id_router = new Router();
 
-r1.get('/path/to/place',() => {
-	console.log('get /path/to/place reached');
-});
+	nested_id_router.addRoute({
+		path: "/other_stuff",
+		methods: "get"
+	}, ([stream,headers,flags], route_data) => {
+		resStream(stream,200);
+	});
 
-r1.use('/path',() => {
-	console.log('/path middleware');
-});
+	nested_id_router.addRoute({
+		path: "/query/:table",
+		methods: "get"
+	}, ([stream,headrs,flags],route_data) => {
+		resStream(
+			stream,
+			200,
+			`${route_data.params["id"]},${route_data.params["table"]}`
+		);
+	})
+	
+	nested_id_router.addRoute({
+		path: "/",
+		methods: "get"
+	}, ([stream,headers,flags],route_data) => {
+		let url = route_data.getURL();
 
-r1.post('/path/to/place',() => {
-	console.log('post /path/to/place reached');
-});
+		resStream(stream, 200, `${route_data.params["id"]},${url.pathname + url.search}`);
+	});
+	
+	router.addMount({
+		path: "/nested/:id"
+	},nested_id_router);
 
-r1.addMount({path:'/other'},r2);
+	console.log("creating server");
+	
+	const server = http2.createServer();
+	let sessions = [];
 
-r2.get('/some/place',() => {
-	console.log('get /other/some/place reached');
-});
+	server.on("session", session => {
+		let ses_index = 0;
+		let set_session = false;
 
-console.log('router\n' + global.routerStructure(r1,null));
+		for(; ses_index < sessions.length; ++ses_index) {
+			if (sessions[ses_index] == null) {
+				sessions[ses_index] = session;
+				set_session = true;
+				break;
+			}
+		}
 
-(async () => {
-	console.log('\ntest one----------');
-	try {
-		let run = {'method':'get','url':'/path/to/place'};
-		console.log('find',run);
-		let rtn = await r1.run({'method':'get','url':'/path/to/place'},{});
-		console.log('rtn',rtn);
-	} catch(err) {
-		console.log(err.stack);
-	}
-	console.log('\ntest two----------');
-	try {
-		let run = {'method':'post','url':'/path/to/place'};
-		console.log('find',run);
-		let rtn = await r1.run({'method':'post','url':'/path/to/place'},{});
-		console.log('rtn',rtn);
-	} catch(err) {
-		console.log(err.stack);
-	}
-	console.log('\ntest three--------');
-	try {
-		let run = {'method':'get','url':'/other/some/place'};
-		console.log('find',run);
-		let rtn = await r1.run({'method':'get','url':'/other/some/place'},{});
-		console.log('rtn',rtn);
-	} catch(err) {
-		console.log(err.stack);
-	}
-})();
+		if (!set_session) {
+			sessions.push(session);
+		}
+
+		session.on("close", () => {
+			sessions[ses_index] = null;
+		});
+
+		session.on("stream", async (stream,headers,flags) => {
+			let url = new URL(headers[":path"],`${headers[":scheme"]}://${headers[":authority"]}`);
+
+			try {
+				let result = await router.run(url,headers[":method"].toLowerCase(),[stream,headers,flags]);
+
+				if (!result.found_path) {
+					resStream(stream,404,"not found");
+				}
+				else {
+					if (!result.valid_method) {
+						resStream(stream,405,"invalid method");
+					}
+				}
+			} catch (err) {
+				console.error(err.stack);
+
+				if (stream.headersSent) {
+					stream.close(http2.constants.NGHTTP2_INTERNAL_ERROR);
+				}
+				else {
+					resStream(stream,500,"server error");
+				}
+			}
+
+			console.log(`${headers[":method"]} ${stream.sentHeaders[":status"]} ${headers[":path"]}`);
+		});
+	});
+
+	server.on("listening",() => {
+		console.log("server listening");
+	});
+
+	server.listen(8000);
+}
+
+console.log("running test server");
+
+main().catch(err => console.error(err.stack));

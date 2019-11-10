@@ -3,10 +3,12 @@ import * as nURL from "url";
 import pathToRegexp from "path-to-regexp";
 import _ from "lodash";
 
+import RoutingData from "./RoutingData";
+
 type CallableTypeReturn = boolean | void;
 
 export interface Callback<T extends any[]> {
-	(args: T, params?: ParamsObject):  CallableTypeReturn | Promise<CallableTypeReturn>
+	(args: T, params?: RoutingData<T>):  CallableTypeReturn | Promise<CallableTypeReturn>
 }
 
 export interface RouteOptions {
@@ -14,14 +16,14 @@ export interface RouteOptions {
 	name?: string,
 	methods?: string | string[],
 	no_final?: boolean,
-	options?: pathToRegexp.ParseOptions,
+	options?: pathToRegexp.RegExpOptions,
 	regex?: RegExp
 };
 
 export interface MountOptions {
 	path?: string,
 	name?: string,
-	options?: pathToRegexp.ParseOptions,
+	options?: pathToRegexp.RegExpOptions,
 	regex?: RegExp
 }
 
@@ -57,10 +59,6 @@ export interface RouterRunResult {
 	valid_method: boolean
 }
 
-interface ParamsObject {
-	[key: string]: string
-}
-
 function getTabs(count: number, character: string = "  ") {
 	let rtn = '';
 
@@ -92,6 +90,9 @@ class Router<T extends any[]> {
 	private routes: Map<string,Route<T> | Mount<T>> = new Map();
 	private parent: Router<T> = null;
 	private children: Router<T>[] = [];
+
+	readonly mount_key_name: string = "MOUNTPATHKEY";
+	
 	readonly name: string;
 	
 	constructor(options?: RouterOptions) {
@@ -103,6 +104,18 @@ class Router<T extends any[]> {
 
 		this.opts = opts;
 		this.name = opts.name;
+	}
+
+	private checkMountPath(given: string) {
+		let rtn = given;
+
+		if (rtn[rtn.length - 1] !== "/") {
+			rtn += "/";
+		}
+
+		rtn += `:${this.mount_key_name}(.*)`;
+
+		return rtn;
 	}
 
 	static routerToStr(router: Router<any[]>, depth: number, count: number) {
@@ -143,7 +156,7 @@ class Router<T extends any[]> {
 		return parsed;
 	}
 
-	public static getRegex(route: pathToRegexp.Path, options: pathToRegexp.ParseOptions) {
+	public static getRegex(route: pathToRegexp.Path, options: pathToRegexp.RegExpOptions) {
 		let keys = [];
 		let regex = pathToRegexp(route,keys, options);
 
@@ -154,7 +167,7 @@ class Router<T extends any[]> {
 		route: Route<T>, 
 		method: string, 
 		passing: T,
-		params: ParamsObject
+		data: RoutingData<T>
 	) {
 		let rtn = {
 			found_path: false,
@@ -173,7 +186,7 @@ class Router<T extends any[]> {
 		}
 
 		for (let mid of route.middleware) {
-			let next = await Promise.resolve(mid(passing, params));
+			let next = await Promise.resolve(mid(passing, data));
 
 			if (typeof next === "boolean") {
 				if (!next) {
@@ -184,7 +197,7 @@ class Router<T extends any[]> {
 
 		if (method_opts) {
 			for (let mid of method_opts.middleware) {
-				let next = await Promise.resolve(mid(passing, params));
+				let next = await Promise.resolve(mid(passing, data));
 
 				if (typeof next === "boolean") {
 					if (!next) {
@@ -200,7 +213,7 @@ class Router<T extends any[]> {
 				return rtn;
 			}
 
-			await Promise.resolve(method_opts.final(passing, params));
+			await Promise.resolve(method_opts.final(passing, data));
 		}
 
 		return rtn;
@@ -211,10 +224,15 @@ class Router<T extends any[]> {
 		url: nURL.URL, 
 		method: string, 
 		passing: T,
-		params: ParamsObject
+		data: RoutingData<T>
 	) {
+		let mount_path = data.params[this.mount_key_name];
+		let new_url = new nURL.URL("/" + mount_path + url.search, url);
+
+		delete data.params[this.mount_key_name];
+
 		for (let mid of mount.middleware) {
-			let next = await Promise.resolve(mid(passing, params));
+			let next = await Promise.resolve(mid(passing, data));
 
 			if (typeof next === "boolean") {
 				if (!next) {
@@ -223,15 +241,17 @@ class Router<T extends any[]> {
 			}
 		}
 
-		let next_url = new nURL.URL(mount.path === "/" ? mount.path : url.pathname.replace(mount.path,""), url);
-		return await mount.router.runInternal(next_url, method, passing, params);
+		return await mount.router.runInternal(new_url, method, passing, data);
 	}
 
-	private async runInternal(url: nURL.URL, method: string, passing: T, params: ParamsObject) {
+	private async runInternal(url: nURL.URL, method: string, passing: T, data: RoutingData<T>) {
 		let rtn = {
 			found_path: false,
 			valid_method: false
 		};
+
+		data["prev_urls"].push(url);
+		data["prev_routers"].push(this);
 		
 		for (let [key, route] of this.routes) {
 			let r_type = route.type;
@@ -241,16 +261,16 @@ class Router<T extends any[]> {
 
 			if (test) {
 				if (route.keys != null) {
-					params = _.merge({},params,Router.mapRegexToObj(test, route.keys));
+					data.params = _.merge({},data.params,Router.mapRegexToObj(test, route.keys));
 				}
 
 				switch(r_type) {
 					case "endpt":
 					case "mdlwr":
-						rtn = await this.handleRoute(<Route<T>>route, method, passing, params);
+						rtn = await this.handleRoute(<Route<T>>route, method, passing, data);
 						break;
 					case "mount":
-						rtn = await this.handleMount(<Mount<T>>route, url, method, passing, params);
+						rtn = await this.handleMount(<Mount<T>>route, url, method, passing, data);
 						break;
 				}
 
@@ -268,7 +288,9 @@ class Router<T extends any[]> {
 			url = new nURL.URL(url);
 		}
 
-		return this.runInternal(url,method,passing,{});
+		let routing_data = new RoutingData<T>([],[]);
+
+		return this.runInternal(url,method,passing,routing_data);
 	}
 
 	public addRoute(data: RouteOptions, ...middleware: Callback<T>[] | [Callback<T>[]]) {
@@ -393,10 +415,12 @@ class Router<T extends any[]> {
 			middleware = middleware[0];
 		}
 
+		let regex_path = this.checkMountPath(data.path);
+
 		if (!r) {
 			data.options = _.merge({},data.options,{end:false});
 			let use_custom_regex = "regex" in data;
-			let {keys, regex} = Router.getRegex(data.path,data.options);
+			let {keys, regex} = Router.getRegex(regex_path,data.options);
 			let router = middleware[middleware.length - 1];
 
 			if (!(router instanceof Router)) {

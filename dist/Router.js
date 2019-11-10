@@ -1,6 +1,7 @@
 import * as nURL from "url";
 import pathToRegexp from "path-to-regexp";
 import _ from "lodash";
+import RoutingData from "./RoutingData";
 ;
 function getTabs(count, character = "  ") {
     let rtn = '';
@@ -25,12 +26,21 @@ class Router {
         this.routes = new Map();
         this.parent = null;
         this.children = [];
+        this.mount_key_name = "MOUNTPATHKEY";
         let opts = _.merge({}, default_router_options, options == null ? {} : options);
         if (typeof opts["name"] !== "string") {
             throw new Error("options.name must be a string");
         }
         this.opts = opts;
         this.name = opts.name;
+    }
+    checkMountPath(given) {
+        let rtn = given;
+        if (rtn[rtn.length - 1] !== "/") {
+            rtn += "/";
+        }
+        rtn += `:${this.mount_key_name}(.*)`;
+        return rtn;
     }
     static routerToStr(router, depth, count) {
         let name = `${getTabs(count)}name: ${router.name}\n`;
@@ -68,7 +78,7 @@ class Router {
         let regex = pathToRegexp(route, keys, options);
         return { keys, regex };
     }
-    async handleRoute(route, method, passing, params) {
+    async handleRoute(route, method, passing, data) {
         let rtn = {
             found_path: false,
             valid_method: false,
@@ -82,7 +92,7 @@ class Router {
             rtn.valid_method = true;
         }
         for (let mid of route.middleware) {
-            let next = await Promise.resolve(mid(passing, params));
+            let next = await Promise.resolve(mid(passing, data));
             if (typeof next === "boolean") {
                 if (!next) {
                     return { found_path: true, valid_method: true };
@@ -91,7 +101,7 @@ class Router {
         }
         if (method_opts) {
             for (let mid of method_opts.middleware) {
-                let next = await Promise.resolve(mid(passing, params));
+                let next = await Promise.resolve(mid(passing, data));
                 if (typeof next === "boolean") {
                     if (!next) {
                         return { found_path: true, valid_method: true };
@@ -104,42 +114,46 @@ class Router {
             else if (!method_opts.final) {
                 return rtn;
             }
-            await Promise.resolve(method_opts.final(passing, params));
+            await Promise.resolve(method_opts.final(passing, data));
         }
         return rtn;
     }
-    async handleMount(mount, url, method, passing, params) {
+    async handleMount(mount, url, method, passing, data) {
+        let mount_path = data.params[this.mount_key_name];
+        let new_url = new nURL.URL("/" + mount_path + url.search, url);
+        delete data.params[this.mount_key_name];
         for (let mid of mount.middleware) {
-            let next = await Promise.resolve(mid(passing, params));
+            let next = await Promise.resolve(mid(passing, data));
             if (typeof next === "boolean") {
                 if (!next) {
                     return { found_path: true, valid_method: true };
                 }
             }
         }
-        let next_url = new nURL.URL(mount.path === "/" ? mount.path : url.pathname.replace(mount.path, ""), url);
-        return await mount.router.runInternal(next_url, method, passing, params);
+        return await mount.router.runInternal(new_url, method, passing, data);
     }
-    async runInternal(url, method, passing, params) {
+    async runInternal(url, method, passing, data) {
         let rtn = {
             found_path: false,
             valid_method: false
         };
+        data["prev_urls"].push(url);
+        data["prev_routers"].push(this);
         for (let [key, route] of this.routes) {
             let r_type = route.type;
             let r_key = `${route.name}:${route.path}`;
             let test = route.regex.exec(url.pathname);
             if (test) {
                 if (route.keys != null) {
-                    params = _.merge({}, params, Router.mapRegexToObj(test, route.keys));
+                    data.params = _.merge({}, data.params, Router.mapRegexToObj(test, route.keys));
                 }
                 switch (r_type) {
                     case "endpt":
                     case "mdlwr":
-                        rtn = await this.handleRoute(route, method, passing, params);
+                        rtn = await this.handleRoute(route, method, passing, data);
                         break;
                     case "mount":
-                        rtn = await this.handleMount(route, url, method, passing, params);
+                        rtn = await this.handleMount(route, url, method, passing, data);
                         break;
                 }
                 if (rtn.found_path) {
@@ -153,7 +167,8 @@ class Router {
         if (!(url instanceof nURL.URL)) {
             url = new nURL.URL(url);
         }
-        return this.runInternal(url, method, passing, {});
+        let routing_data = new RoutingData([], []);
+        return this.runInternal(url, method, passing, routing_data);
     }
     addRoute(data, ...middleware) {
         data = _.merge({}, default_route_options, data);
@@ -259,10 +274,11 @@ class Router {
         if (middleware.length === 1 && Array.isArray(middleware[0])) {
             middleware = middleware[0];
         }
+        let regex_path = this.checkMountPath(data.path);
         if (!r) {
             data.options = _.merge({}, data.options, { end: false });
             let use_custom_regex = "regex" in data;
-            let { keys, regex } = Router.getRegex(data.path, data.options);
+            let { keys, regex } = Router.getRegex(regex_path, data.options);
             let router = middleware[middleware.length - 1];
             if (!(router instanceof Router)) {
                 throw new Error("mount poiont must be an instance of Router");
