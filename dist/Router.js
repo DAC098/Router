@@ -3,6 +3,12 @@ import pathToRegexp from "path-to-regexp";
 import _ from "lodash";
 import RoutingData from "./RoutingData";
 ;
+var RouteTypes;
+(function (RouteTypes) {
+    RouteTypes["MOUNT"] = "mount";
+    RouteTypes["ENDPT"] = "endpt";
+    RouteTypes["MDLWR"] = "mdlwr";
+})(RouteTypes || (RouteTypes = {}));
 function getTabs(count, character = "  ") {
     let rtn = '';
     for (let c = 0; c < count; ++c) {
@@ -18,8 +24,8 @@ const default_route_options = {
     options: {}
 };
 const default_router_options = {
-    methods: ["get", "post", "put", "delete", "options", "trace", "connect", "patch"],
-    name: ""
+    name: "",
+    method_case: 0
 };
 class Router {
     constructor(options) {
@@ -42,11 +48,22 @@ class Router {
         rtn += `:${this.mount_key_name}(.*)`;
         return rtn;
     }
+    getMethodStr(method) {
+        switch (this.opts.method_case) {
+            case 1:
+                return method.toLowerCase();
+            case 2:
+                return method.toUpperCase();
+            case 0:
+            default:
+                return method;
+        }
+    }
     static routerToStr(router, depth, count) {
         let name = `${getTabs(count)}name: ${router.name}\n`;
         let rots = `${getTabs(count)}routes:\n`;
         for (let [k, v] of router.routes) {
-            if (v.type === 'mount') {
+            if (v.type === RouteTypes.MOUNT) {
                 if (depth === null || depth === undefined || depth !== count) {
                     rots += getTabs(count + 1) + 'key: ' + k + '\n' +
                         getTabs(count + 1) + 'middleware: ' + v.middleware.length + '\n' +
@@ -84,7 +101,7 @@ class Router {
             valid_method: false,
         };
         let method_opts = route.methods.get(method);
-        if (route.type === "endpt") {
+        if (route.type === RouteTypes.ENDPT) {
             rtn.found_path = true;
             if (!method_opts) {
                 return rtn;
@@ -108,7 +125,7 @@ class Router {
                     }
                 }
             }
-            if (!method_opts.final && route.type === "endpt") {
+            if (!method_opts.final && route.type === RouteTypes.ENDPT) {
                 throw new Error("no final method for route");
             }
             else if (!method_opts.final) {
@@ -140,19 +157,17 @@ class Router {
         data["prev_urls"].push(url);
         data["prev_routers"].push(this);
         for (let [key, route] of this.routes) {
-            let r_type = route.type;
-            let r_key = `${route.name}:${route.path}`;
             let test = route.regex.exec(url.pathname);
             if (test) {
                 if (route.keys != null) {
                     data.params = _.merge({}, data.params, Router.mapRegexToObj(test, route.keys));
                 }
-                switch (r_type) {
-                    case "endpt":
-                    case "mdlwr":
+                switch (route.type) {
+                    case RouteTypes.ENDPT:
+                    case RouteTypes.MDLWR:
                         rtn = await this.handleRoute(route, method, passing, data);
                         break;
-                    case "mount":
+                    case RouteTypes.MOUNT:
                         rtn = await this.handleMount(route, url, method, passing, data);
                         break;
                 }
@@ -174,134 +189,87 @@ class Router {
         data = _.merge({}, default_route_options, data);
         if (data.path === null || typeof data.path !== 'string')
             throw new Error('no path given for route');
-        let type = data.no_final ? 'mdlwr' : 'endpt';
+        let type = data.no_final ? RouteTypes.MDLWR : RouteTypes.ENDPT;
         let name = typeof data.name === "string" ? data.name : "";
-        let key = `${type}:${name}:${data.path}`;
+        let key = `${type}:${data.path}`;
         let r = this.routes.get(key);
-        let added = false;
         if (Array.isArray(middleware[0])) {
             middleware = middleware[0];
         }
-        if (!r) {
-            let custom_regex = 'regex' in data;
-            let { keys, regex } = Router.getRegex(data.path, data.options);
-            let final = !data.no_final ? middleware[middleware.length - 1] : null;
-            let middleware_mod = !data.no_final ? middleware.slice(0, middleware.length - 1) : middleware;
-            r = {
-                methods: new Map(),
-                path: data.path,
-                name: data.name,
-                regex: custom_regex ? data.regex : regex,
-                keys: custom_regex ? [] : keys,
-                middleware: [],
-                type
-            };
-            if ('methods' in data && (data.methods.length > 0)) {
-                if (typeof data.methods === 'string') {
-                    let k = data.methods.toLowerCase();
+        if (r) {
+            throw new Error("route already exists");
+        }
+        let custom_regex = 'regex' in data;
+        let { keys, regex } = Router.getRegex(data.path, data.options);
+        let final = !data.no_final ? middleware[middleware.length - 1] : null;
+        let middleware_mod = !data.no_final ? middleware.slice(0, middleware.length - 1) : middleware;
+        r = {
+            methods: new Map(),
+            path: data.path,
+            name: name,
+            regex: custom_regex ? data.regex : regex,
+            keys: custom_regex ? [] : keys,
+            middleware: [],
+            type
+        };
+        if ('methods' in data && (data.methods.length > 0)) {
+            if (typeof data.methods === 'string') {
+                let k = this.getMethodStr(data.methods);
+                let m = {
+                    middleware: middleware_mod,
+                    final
+                };
+                r.methods.set(k, m);
+            }
+            else {
+                for (let s of data.methods) {
+                    let k = this.getMethodStr(s);
                     let m = {
                         middleware: middleware_mod,
                         final
                     };
                     r.methods.set(k, m);
                 }
-                else {
-                    for (let s of data.methods) {
-                        let k = s.toLowerCase();
-                        let m = {
-                            middleware: middleware_mod,
-                            final
-                        };
-                        r.methods.set(k, m);
-                    }
-                }
             }
-            else {
-                r.middleware = r.middleware.concat(middleware);
-            }
-            added = true;
         }
         else {
-            if ('methods' in data) {
-                if (typeof data.methods === 'string') {
-                    let k = data.methods.toLowerCase();
-                    let method = r.methods.get(k);
-                    if (!method) {
-                        method = {
-                            middleware: (!data.no_final ? middleware.slice(0, middleware.length - 1) : middleware),
-                            final: !data.no_final ? middleware[middleware.length - 1] : null
-                        };
-                    }
-                    else {
-                        method.middleware = method.middleware.concat(middleware);
-                    }
-                    r.methods.set(k, method);
-                }
-                else {
-                    for (let m of data.methods) {
-                        let k = m.toLowerCase();
-                        let method = r.methods.get(k);
-                        if (!method) {
-                            method = {
-                                middleware: (!data.no_final ? middleware.slice(0, middleware.length - 1) : middleware),
-                                final: !data.no_final ? middleware[middleware.length - 1] : null
-                            };
-                        }
-                        else {
-                            method.middleware = method.middleware.concat(middleware);
-                        }
-                        r.methods.set(k, method);
-                    }
-                }
-            }
-            else {
-                r.middleware = r.middleware.concat(middleware);
-            }
+            r.middleware = r.middleware.concat(middleware);
         }
-        // if(added)
-        // 	global.emit('addRoute',this,key);
         this.routes.set(key, r);
     }
     addMount(data, ...middleware) {
         if (data.path === null || typeof data.path !== 'string') {
             throw new Error('no path given for route');
         }
-        let type = "mount";
+        let type = RouteTypes.MOUNT;
         let name = typeof data.name === "string" ? data.name : "";
-        let key = `${type}:${name}:${data.path}`;
-        let added = false;
+        let key = `${type}:${data.path}`;
         let r = this.routes.get(key);
         if (middleware.length === 1 && Array.isArray(middleware[0])) {
             middleware = middleware[0];
         }
+        if (r) {
+            throw new Error("mount already exists");
+        }
+        data.options = _.merge({}, data.options, { end: false });
         let regex_path = this.checkMountPath(data.path);
-        if (!r) {
-            data.options = _.merge({}, data.options, { end: false });
-            let use_custom_regex = "regex" in data;
-            let { keys, regex } = Router.getRegex(regex_path, data.options);
-            let router = middleware[middleware.length - 1];
-            if (!(router instanceof Router)) {
-                throw new Error("mount poiont must be an instance of Router");
-            }
-            router.parent = this;
-            this.children.push(router);
-            r = {
-                path: data.path,
-                regex: use_custom_regex ? data.regex : regex,
-                keys: use_custom_regex ? [] : keys,
-                middleware: middleware.slice(0, middleware.length - 1),
-                router,
-                type,
-                name
-            };
-            added = true;
+        let use_custom_regex = "regex" in data;
+        let { keys, regex } = Router.getRegex(regex_path, data.options);
+        let router = middleware[middleware.length - 1];
+        if (!(router instanceof Router)) {
+            throw new Error("mount poiont must be an instance of Router");
         }
-        else {
-            r.middleware = r.middleware.concat(middleware);
-        }
-        // if (added) {
-        // 	global.emit("addMount", this, key);
-        // }
+        router.parent = this;
+        this.children.push(router);
+        r = {
+            path: data.path,
+            regex: use_custom_regex ? data.regex : regex,
+            keys: use_custom_regex ? [] : keys,
+            middleware: middleware.slice(0, middleware.length - 1),
+            router,
+            type,
+            name
+        };
         this.routes.set(key, r);
     }
 }

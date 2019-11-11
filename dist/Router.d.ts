@@ -20,13 +20,18 @@ export interface MountOptions {
     options?: pathToRegexp.RegExpOptions;
     regex?: RegExp;
 }
+declare enum RouteTypes {
+    MOUNT = "mount",
+    ENDPT = "endpt",
+    MDLWR = "mdlwr"
+}
 interface RouteBase<T extends any[]> {
     path: string;
     name: string;
     regex: RegExp;
     keys: pathToRegexp.Key[];
     middleware: Callback<T>[];
-    type: string;
+    type: RouteTypes;
 }
 interface MethodContainer<T extends any[]> {
     middleware: Callback<T>[];
@@ -39,8 +44,8 @@ export interface Mount<T extends any[]> extends RouteBase<T> {
     router: Router<T>;
 }
 export interface RouterOptions {
-    methods?: string[];
     name?: string;
+    method_case?: number;
 }
 export interface RouterRunResult {
     found_path: boolean;
@@ -57,6 +62,7 @@ declare class Router<T extends any[]> {
     readonly name: string;
     constructor(options?: RouterOptions);
     private checkMountPath;
+    private getMethodStr;
     static routerToStr(router: Router<any[]>, depth: number, count: number): string;
     private static mapRegexToObj;
     static getRegex(route: pathToRegexp.Path, options: pathToRegexp.RegExpOptions): {
