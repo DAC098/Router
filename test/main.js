@@ -65,7 +65,32 @@ async function main() {
 			200,
 			`${route_data.params["id"]},${route_data.params["table"]}`
 		);
-	})
+	});
+
+	nested_id_router.addRoute({
+		path: "/query/:table",
+		methods: "post"
+	}, ([stream,headers,flags], route_data) => resStream(stream,200));
+
+	try {
+		nested_id_router.addRoute({
+			path: "/query/:table",
+			methods: "get"
+		}, ([stream,headers,flags], route_data) => {});
+
+		console.warn("was able to add a route that already exists");
+	}
+	catch(err) {}
+
+	try {
+		nested_id_router.addRoute({
+			path: "/query/:table",
+			methods: ["get","post"]
+		}, ([stream,headers,flags], route_data) => {});
+
+		console.warn("was able to add a route that already exists");
+	}
+	catch(err) {}
 	
 	nested_id_router.addRoute({
 		path: "/",
