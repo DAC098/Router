@@ -1,0 +1,1 @@
+{"version":3,"file":"GlobalRouter.js","sourceRoot":"","sources":["../../lib/GlobalRouter.ts"],"names":[],"mappings":";;AAAA,mCAAsC;AAMtC,MAAM,YAAa,SAAQ,qBAAY;IAInC;QACI,KAAK,EAAE,CAAC;QAHJ,aAAQ,GAAW,CAAC,CAAC;IAI7B,CAAC;IAED,KAAK;QACD,OAAO,EAAE,IAAI,CAAC,QAAQ,CAAC;IAC3B,CAAC;CACJ;AAED,kBAAe,YAAY,CAAC"}

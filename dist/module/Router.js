@@ -1,6 +1,5 @@
 import * as nURL from "url";
 import pathToRegexp from "path-to-regexp";
-import _ from "lodash";
 import RoutingData from "./RoutingData";
 ;
 var RouteTypes;
@@ -33,7 +32,10 @@ class Router {
         this.parent = null;
         this.children = [];
         this.mount_key_name = "MOUNTPATHKEY";
-        let opts = _.merge({}, default_router_options, options == null ? {} : options);
+        let opts = {
+            ...default_router_options,
+            ...(options == null ? {} : options)
+        };
         if (typeof opts["name"] !== "string") {
             throw new Error("options.name must be a string");
         }
@@ -160,7 +162,7 @@ class Router {
             let test = route.regex.exec(url.pathname);
             if (test) {
                 if (route.keys != null) {
-                    data.params = _.merge({}, data.params, Router.mapRegexToObj(test, route.keys));
+                    data.params = { ...data.params, ...Router.mapRegexToObj(test, route.keys) };
                 }
                 switch (route.type) {
                     case RouteTypes.ENDPT:
@@ -186,7 +188,7 @@ class Router {
         return this.runInternal(url, method, passing, routing_data);
     }
     addRoute(data, ...middleware) {
-        data = _.merge({}, default_route_options, data);
+        data = { ...default_route_options, ...data };
         if (data.path === null || typeof data.path !== 'string')
             throw new Error('no path given for route');
         let type = data.no_final ? RouteTypes.MDLWR : RouteTypes.ENDPT;
@@ -251,7 +253,7 @@ class Router {
         if (r) {
             throw new Error("mount already exists");
         }
-        data.options = _.merge({}, data.options, { end: false });
+        data.options = { ...data.options, end: false };
         let regex_path = this.checkMountPath(data.path);
         let use_custom_regex = "regex" in data;
         let { keys, regex } = Router.getRegex(regex_path, data.options);

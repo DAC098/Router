@@ -1,21 +1,20 @@
 {
-  "name": "router",
-  "version": "3.0.2",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "dependencies": {
-    "lodash": "^4.17.15",
-    "path-to-regexp": "^3.1.0"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/DAC098/Router.git"
-  },
-  "author": "David Cathers",
-  "license": "MIT",
-  "devDependencies": {
-    "@types/node": "^12.12.6",
-    "typescript": "^3.7.2"
-  },
-  "type": "module"
+    "name": "router",
+    "version": "3.1.0",
+    "type": "module",
+    "main": "./dist/commonjs/index.js",
+    "module": "./dist/module/index.js",
+    "dependencies": {
+        "path-to-regexp": "^3.2.0"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/DAC098/Router.git"
+    },
+    "author": "David Cathers",
+    "license": "MIT",
+    "devDependencies": {
+        "@types/node": "^12.12.38",
+        "typescript": "^3.8.3"
+    }
 }
