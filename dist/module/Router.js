@@ -198,44 +198,71 @@ class Router {
         if (Array.isArray(middleware[0])) {
             middleware = middleware[0];
         }
-        if (r) {
-            throw new Error("route already exists");
-        }
         let custom_regex = 'regex' in data;
         let { keys, regex } = Router.getRegex(data.path, data.options);
         let final = !data.no_final ? middleware[middleware.length - 1] : null;
         let middleware_mod = !data.no_final ? middleware.slice(0, middleware.length - 1) : middleware;
-        r = {
-            methods: new Map(),
-            path: data.path,
-            name: name,
-            regex: custom_regex ? data.regex : regex,
-            keys: custom_regex ? [] : keys,
-            middleware: [],
-            type
-        };
-        if ('methods' in data && (data.methods.length > 0)) {
-            if (typeof data.methods === 'string') {
-                let k = this.getMethodStr(data.methods);
-                let m = {
-                    middleware: middleware_mod,
-                    final
-                };
-                r.methods.set(k, m);
-            }
-            else {
-                for (let s of data.methods) {
-                    let k = this.getMethodStr(s);
+        if (!r) {
+            r = {
+                methods: new Map(),
+                path: data.path,
+                name: name,
+                regex: custom_regex ? data.regex : regex,
+                keys: custom_regex ? [] : keys,
+                middleware: [],
+                type
+            };
+            if ('methods' in data && (data.methods.length > 0)) {
+                if (typeof data.methods === 'string') {
+                    let k = this.getMethodStr(data.methods);
                     let m = {
                         middleware: middleware_mod,
                         final
                     };
                     r.methods.set(k, m);
                 }
+                else {
+                    for (let s of data.methods) {
+                        let k = this.getMethodStr(s);
+                        let m = {
+                            middleware: middleware_mod,
+                            final
+                        };
+                        r.methods.set(k, m);
+                    }
+                }
             }
         }
         else {
-            r.middleware = r.middleware.concat(middleware);
+            if ("methods" in data && data.methods.length > 0) {
+                if (typeof data.methods === "string") {
+                    let k = this.getMethodStr(data.methods);
+                    if (r.methods.has(k)) {
+                        throw new Error(`route and method already exists. path: "${data.path}" method: "${k}"`);
+                    }
+                    let m = {
+                        middleware: middleware_mod,
+                        final
+                    };
+                    r.methods.set(k, m);
+                }
+                else {
+                    for (let s of data.methods) {
+                        let k = this.getMethodStr(s);
+                        if (r.methods.has(k)) {
+                            throw new Error(`route and method already exists. path: "${data.path}" method: "${k}"`);
+                        }
+                        let m = {
+                            middleware: middleware_mod,
+                            final
+                        };
+                        r.methods.set(k, m);
+                    }
+                }
+            }
+            else {
+                throw new Error(`route already exists. path: "${data.path}"`);
+            }
         }
         this.routes.set(key, r);
     }
@@ -259,7 +286,7 @@ class Router {
         let { keys, regex } = Router.getRegex(regex_path, data.options);
         let router = middleware[middleware.length - 1];
         if (!(router instanceof Router)) {
-            throw new Error("mount poiont must be an instance of Router");
+            throw new Error("mount point must be an instance of Router");
         }
         router.parent = this;
         this.children.push(router);
