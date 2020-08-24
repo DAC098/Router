@@ -15,14 +15,14 @@ async function main() {
 	router.addRoute({
 		path: "/",
 		methods: "get"
-	},([stream,headers,flags],route_data) => {
+	},(stream, headers, flags, route_data) => {
 		resStream(stream,200);
 	});
 
 	router.addRoute({
 		path: "/root",
 		methods: ["get","post"]
-	},([stream,headers,flags],route_data) => {
+	},(stream, headers, flags, route_data) => {
 		resStream(stream,200);
 	});
 
@@ -32,14 +32,14 @@ async function main() {
 		options: {
 			end: false
 		}
-	},([stream,headers,flags],route_data) => {
+	},(stream, headers, flags, route_data) => {
 		resStream(stream,200);
 	});
 
 	router.addRoute({
 		path: "/id/:id?",
 		methods: ["get","post"],
-	}, ([stream,headers,flags],route_data) => {
+	}, (stream, headers, flags,route_data) => {
 		resStream(
 			stream,
 			200,
@@ -52,14 +52,14 @@ async function main() {
 	nested_id_router.addRoute({
 		path: "/other_stuff",
 		methods: "get"
-	}, ([stream,headers,flags], route_data) => {
+	}, (stream, headers, flags, route_data) => {
 		resStream(stream,200);
 	});
 
 	nested_id_router.addRoute({
 		path: "/query/:table",
 		methods: "get"
-	}, ([stream,headrs,flags],route_data) => {
+	}, (stream, headrs, flags, route_data) => {
 		resStream(
 			stream,
 			200,
@@ -70,13 +70,13 @@ async function main() {
 	nested_id_router.addRoute({
 		path: "/query/:table",
 		methods: "post"
-	}, ([stream,headers,flags], route_data) => resStream(stream,200));
+	}, (stream, headers, flags, route_data) => resStream(stream,200));
 
 	try {
 		nested_id_router.addRoute({
 			path: "/query/:table",
 			methods: "get"
-		}, ([stream,headers,flags], route_data) => {});
+		}, (stream, headers, flags, route_data) => {});
 
 		console.warn("was able to add a route that already exists");
 	}
@@ -86,7 +86,7 @@ async function main() {
 		nested_id_router.addRoute({
 			path: "/query/:table",
 			methods: ["get","post"]
-		}, ([stream,headers,flags], route_data) => {});
+		}, (stream,headers,flags, route_data) => {});
 
 		console.warn("was able to add a route that already exists");
 	}
@@ -95,7 +95,7 @@ async function main() {
 	nested_id_router.addRoute({
 		path: "/",
 		methods: "get"
-	}, ([stream,headers,flags],route_data) => {
+	}, (stream, headers, flags, route_data) => {
 		let url = route_data.getURL();
 
 		resStream(stream, 200, `${route_data.params["id"]},${url.pathname + url.search}`);
@@ -103,7 +103,7 @@ async function main() {
 	
 	router.addMount({
 		path: "/nested/:id"
-	},nested_id_router);
+	}, nested_id_router);
 
 	console.log("creating server");
 	

@@ -1,5 +1,5 @@
 import * as nURL from "url";
-import pathToRegexp from "path-to-regexp";
+import { pathToRegexp } from "path-to-regexp";
 import RoutingData from "./RoutingData";
 ;
 var RouteTypes;
@@ -29,12 +29,11 @@ const default_router_options = {
 class Router {
     constructor(options) {
         this.routes = new Map();
-        this.parent = null;
         this.children = [];
         this.mount_key_name = "MOUNTPATHKEY";
         let opts = {
             ...default_router_options,
-            ...(options == null ? {} : options)
+            ...(options ?? {})
         };
         if (typeof opts["name"] !== "string") {
             throw new Error("options.name must be a string");
@@ -111,7 +110,7 @@ class Router {
             rtn.valid_method = true;
         }
         for (let mid of route.middleware) {
-            let next = await Promise.resolve(mid(passing, data));
+            let next = await Promise.resolve(mid(...passing, data));
             if (typeof next === "boolean") {
                 if (!next) {
                     return { found_path: true, valid_method: true };
@@ -120,7 +119,7 @@ class Router {
         }
         if (method_opts) {
             for (let mid of method_opts.middleware) {
-                let next = await Promise.resolve(mid(passing, data));
+                let next = await Promise.resolve(mid(...passing, data));
                 if (typeof next === "boolean") {
                     if (!next) {
                         return { found_path: true, valid_method: true };
@@ -133,7 +132,7 @@ class Router {
             else if (!method_opts.final) {
                 return rtn;
             }
-            await Promise.resolve(method_opts.final(passing, data));
+            await Promise.resolve(method_opts.final(...passing, data));
         }
         return rtn;
     }
@@ -142,7 +141,7 @@ class Router {
         let new_url = new nURL.URL("/" + mount_path + url.search, url);
         delete data.params[this.mount_key_name];
         for (let mid of mount.middleware) {
-            let next = await Promise.resolve(mid(passing, data));
+            let next = await Promise.resolve(mid(...passing, data));
             if (typeof next === "boolean") {
                 if (!next) {
                     return { found_path: true, valid_method: true };
@@ -180,11 +179,12 @@ class Router {
         }
         return rtn;
     }
-    async run(url, method, passing) {
+    async run(url, method, ...passing) {
         if (!(url instanceof nURL.URL)) {
             url = new nURL.URL(url);
         }
-        let routing_data = new RoutingData([], []);
+        method = this.getMethodStr(method);
+        let routing_data = new RoutingData([], [], method, passing);
         return this.runInternal(url, method, passing, routing_data);
     }
     addRoute(data, ...middleware) {
@@ -288,7 +288,6 @@ class Router {
         if (!(router instanceof Router)) {
             throw new Error("mount point must be an instance of Router");
         }
-        router.parent = this;
         this.children.push(router);
         r = {
             path: data.path,

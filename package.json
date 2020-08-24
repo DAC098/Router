@@ -1,11 +1,11 @@
 {
     "name": "router",
-    "version": "3.1.0",
+    "version": "4.0.0",
     "type": "module",
     "main": "./dist/commonjs/index.js",
     "module": "./dist/module/index.js",
     "dependencies": {
-        "path-to-regexp": "^3.2.0"
+        "path-to-regexp": "^6.1.0"
     },
     "repository": {
         "type": "git",
@@ -15,6 +15,6 @@
     "license": "MIT",
     "devDependencies": {
         "@types/node": "^12.12.38",
-        "typescript": "^3.8.3"
+        "typescript": "^4.0.2"
     }
 }

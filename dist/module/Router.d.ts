@@ -1,23 +1,24 @@
 /// <reference types="node" />
 import * as nURL from "url";
-import pathToRegexp from "path-to-regexp";
+import { ParseOptions, TokensToRegexpOptions, Key, Path } from "path-to-regexp";
 import RoutingData from "./RoutingData";
+declare type PathToRegexpOptions = ParseOptions & TokensToRegexpOptions;
 declare type CallableTypeReturn = boolean | void;
 export interface Callback<T extends any[]> {
-    (args: T, params?: RoutingData<T>): CallableTypeReturn | Promise<CallableTypeReturn>;
+    (...args: [...T, RoutingData<T>]): CallableTypeReturn | Promise<CallableTypeReturn>;
 }
 export interface RouteOptions {
     path: string;
     name?: string;
     methods?: string | string[];
     no_final?: boolean;
-    options?: pathToRegexp.RegExpOptions;
+    options?: PathToRegexpOptions;
     regex?: RegExp;
 }
 export interface MountOptions {
     path?: string;
     name?: string;
-    options?: pathToRegexp.RegExpOptions;
+    options?: PathToRegexpOptions;
     regex?: RegExp;
 }
 declare enum RouteTypes {
@@ -29,7 +30,7 @@ interface RouteBase<T extends any[]> {
     path: string;
     name: string;
     regex: RegExp;
-    keys: pathToRegexp.Key[];
+    keys: Key[];
     middleware: Callback<T>[];
     type: RouteTypes;
 }
@@ -56,7 +57,6 @@ declare interface Router<T extends any[]> {
 declare class Router<T extends any[]> {
     private opts;
     private routes;
-    private parent;
     private children;
     readonly mount_key_name: string;
     readonly name: string;
@@ -65,14 +65,14 @@ declare class Router<T extends any[]> {
     private getMethodStr;
     static routerToStr(router: Router<any[]>, depth: number, count: number): string;
     private static mapRegexToObj;
-    static getRegex(route: pathToRegexp.Path, options: pathToRegexp.RegExpOptions): {
+    static getRegex(route: Path, options: PathToRegexpOptions): {
         keys: any[];
         regex: RegExp;
     };
     private handleRoute;
     private handleMount;
     private runInternal;
-    run(url: string | nURL.URL, method: string, passing: T): Promise<{
+    run(url: string | nURL.URL, method: string, ...passing: T): Promise<{
         found_path: boolean;
         valid_method: boolean;
     }>;

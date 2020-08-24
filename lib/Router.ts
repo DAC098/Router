@@ -1,13 +1,12 @@
 import * as nURL from "url";
-
-import pathToRegexp from "path-to-regexp";
-
+import {pathToRegexp, ParseOptions, TokensToRegexpOptions, Key, Path} from "path-to-regexp";
 import RoutingData from "./RoutingData";
 
+type PathToRegexpOptions = ParseOptions & TokensToRegexpOptions;
 type CallableTypeReturn = boolean | void;
 
 export interface Callback<T extends any[]> {
-    (args: T, params?: RoutingData<T>):  CallableTypeReturn | Promise<CallableTypeReturn>
+    (...args: [...T, RoutingData<T>]):  CallableTypeReturn | Promise<CallableTypeReturn>
 }
 
 export interface RouteOptions {
@@ -15,14 +14,14 @@ export interface RouteOptions {
     name?: string,
     methods?: string | string[],
     no_final?: boolean,
-    options?: pathToRegexp.RegExpOptions,
+    options?: PathToRegexpOptions,
     regex?: RegExp
 };
 
 export interface MountOptions {
     path?: string,
     name?: string,
-    options?: pathToRegexp.RegExpOptions,
+    options?: PathToRegexpOptions,
     regex?: RegExp
 }
 
@@ -36,7 +35,7 @@ interface RouteBase<T extends any[]> {
     path: string,
     name: string,
     regex: RegExp,
-    keys: pathToRegexp.Key[],
+    keys: Key[],
     middleware: Callback<T>[],
     type: RouteTypes
 }
@@ -93,7 +92,6 @@ class Router<T extends any[]> {
     
     private opts: RouterOptions;
     private routes: Map<string,Route<T> | Mount<T>> = new Map();
-    private parent: Router<T> = null;
     private children: Router<T>[] = [];
 
     readonly mount_key_name: string = "MOUNTPATHKEY";
@@ -103,7 +101,7 @@ class Router<T extends any[]> {
     constructor(options?: RouterOptions) {
         let opts: RouterOptions = {
             ...default_router_options, 
-            ...(options == null ? {} : options)
+            ...(options ?? {})
         };
 
         if (typeof opts["name"] !== "string") {
@@ -166,7 +164,7 @@ class Router<T extends any[]> {
         return name + rots;
     }
 
-    private static mapRegexToObj(res: RegExpExecArray, keys: pathToRegexp.Key[]) {
+    private static mapRegexToObj(res: RegExpExecArray, keys: Key[]) {
         let parsed = {};
 
         for (let i = 1, len = res.length; i < len; ++i) {
@@ -176,9 +174,9 @@ class Router<T extends any[]> {
         return parsed;
     }
 
-    public static getRegex(route: pathToRegexp.Path, options: pathToRegexp.RegExpOptions) {
+    public static getRegex(route: Path, options: PathToRegexpOptions) {
         let keys = [];
-        let regex = pathToRegexp(route,keys, options);
+        let regex = pathToRegexp(route, keys, options);
 
         return {keys, regex};
     }
@@ -206,7 +204,7 @@ class Router<T extends any[]> {
         }
 
         for (let mid of route.middleware) {
-            let next = await Promise.resolve(mid(passing, data));
+            let next = await Promise.resolve(mid(...passing, data));
 
             if (typeof next === "boolean") {
                 if (!next) {
@@ -217,7 +215,7 @@ class Router<T extends any[]> {
 
         if (method_opts) {
             for (let mid of method_opts.middleware) {
-                let next = await Promise.resolve(mid(passing, data));
+                let next = await Promise.resolve(mid(...passing, data));
 
                 if (typeof next === "boolean") {
                     if (!next) {
@@ -233,7 +231,7 @@ class Router<T extends any[]> {
                 return rtn;
             }
 
-            await Promise.resolve(method_opts.final(passing, data));
+            await Promise.resolve(method_opts.final(...passing, data));
         }
 
         return rtn;
@@ -252,7 +250,7 @@ class Router<T extends any[]> {
         delete data.params[this.mount_key_name];
 
         for (let mid of mount.middleware) {
-            let next = await Promise.resolve(mid(passing, data));
+            let next = await Promise.resolve(mid(...passing, data));
 
             if (typeof next === "boolean") {
                 if (!next) {
@@ -300,12 +298,13 @@ class Router<T extends any[]> {
         return rtn;
     }
 
-    public async run(url: string | nURL.URL, method: string, passing: T) {
+    public async run(url: string | nURL.URL, method: string, ...passing: T) {
         if (!(url instanceof nURL.URL)) {
             url = new nURL.URL(url);
         }
 
-        let routing_data = new RoutingData<T>([],[]);
+        method = this.getMethodStr(method);
+        let routing_data = new RoutingData<T>([],[], method, passing);
 
         return this.runInternal(url,method,passing,routing_data);
     }
@@ -434,7 +433,6 @@ class Router<T extends any[]> {
             throw new Error("mount point must be an instance of Router");
         }
 
-        router.parent = this;
         this.children.push(router);
 
         r = {

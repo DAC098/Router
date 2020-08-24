@@ -9,7 +9,7 @@
 			"problemMatcher": [
 				"$tsc"
 			],
-			"group": "build"
+            "group": "build"
 		},
 		{
 			"type": "typescript",
