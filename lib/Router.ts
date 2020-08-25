@@ -3,10 +3,11 @@ import {pathToRegexp, ParseOptions, TokensToRegexpOptions, Key, Path} from "path
 import RoutingData from "./RoutingData";
 
 type PathToRegexpOptions = ParseOptions & TokensToRegexpOptions;
-type CallableTypeReturn = boolean | void;
+type CallbackReturnType = boolean | void;
+type CallbackResult = CallbackReturnType | Promise<CallbackReturnType>;
 
 export interface Callback<T extends any[]> {
-    (...args: [...T, RoutingData<T>]):  CallableTypeReturn | Promise<CallableTypeReturn>
+    (...args: [...T, RoutingData<T>]):  CallbackResult
 }
 
 export interface RouteOptions {

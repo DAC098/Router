@@ -3,9 +3,10 @@ import * as nURL from "url";
 import { ParseOptions, TokensToRegexpOptions, Key, Path } from "path-to-regexp";
 import RoutingData from "./RoutingData";
 declare type PathToRegexpOptions = ParseOptions & TokensToRegexpOptions;
-declare type CallableTypeReturn = boolean | void;
+declare type CallbackReturnType = boolean | void;
+declare type CallbackResult = CallbackReturnType | Promise<CallbackReturnType>;
 export interface Callback<T extends any[]> {
-    (...args: [...T, RoutingData<T>]): CallableTypeReturn | Promise<CallableTypeReturn>;
+    (...args: [...T, RoutingData<T>]): CallbackResult;
 }
 export interface RouteOptions {
     path: string;
