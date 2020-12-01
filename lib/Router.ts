@@ -1,6 +1,7 @@
 import * as nURL from "url";
 import {pathToRegexp, ParseOptions, TokensToRegexpOptions, Key, Path} from "path-to-regexp";
 import RoutingData from "./RoutingData";
+import RouterError from "./error/RouterError";
 
 type PathToRegexpOptions = ParseOptions & TokensToRegexpOptions;
 type CallbackReturnType = boolean | void;
@@ -106,7 +107,7 @@ class Router<T extends any[]> {
         };
 
         if (typeof opts["name"] !== "string") {
-            throw new Error("options.name must be a string");
+            throw new RouterError("options.name must be a string");
         }
 
         this.opts = opts;
@@ -226,9 +227,8 @@ class Router<T extends any[]> {
             }
 
             if (!method_opts.final && route.type === RouteTypes.ENDPT) {
-                throw new Error("no final method for route");
-            }
-            else if (!method_opts.final) {
+                throw new RouterError("no final method for route");
+            } else if (!method_opts.final) {
                 return rtn;
             }
 
@@ -314,7 +314,7 @@ class Router<T extends any[]> {
         data = {...default_route_options,...data};
 
         if(data.path === null || typeof data.path !== 'string')
-            throw new Error('no path given for route');
+            throw new RouterError('no path given for route');
 
         let type = data.no_final ? RouteTypes.MDLWR : RouteTypes.ENDPT;
         let name = typeof data.name === "string" ? data.name : "";
@@ -350,8 +350,7 @@ class Router<T extends any[]> {
                     };
     
                     r.methods.set(k, m);
-                }
-                else {
+                } else {
                     for(let s of data.methods) {
                         let k = this.getMethodStr(s);
                         let m = {
@@ -370,7 +369,7 @@ class Router<T extends any[]> {
                     let k = this.getMethodStr(data.methods);
 
                     if (r.methods.has(k)) {
-                        throw new Error(`route and method already exists. path: "${data.path}" method: "${k}"`);
+                        throw new RouterError(`route and method already exists. path: "${data.path}" method: "${k}"`);
                     }
 
                     let m = {
@@ -379,13 +378,12 @@ class Router<T extends any[]> {
                     }
 
                     r.methods.set(k,m);
-                }
-                else {
+                } else {
                     for (let s of data.methods) {
                         let k = this.getMethodStr(s);
 
                         if (r.methods.has(k)) {
-                            throw new Error(`route and method already exists. path: "${data.path}" method: "${k}"`);
+                            throw new RouterError(`route and method already exists. path: "${data.path}" method: "${k}"`);
                         }
 
                         let m = {
@@ -396,9 +394,8 @@ class Router<T extends any[]> {
                         r.methods.set(k,m);
                     }
                 }
-            }
-            else {
-                throw new Error(`route already exists. path: "${data.path}"`);
+            } else {
+                throw new RouterError(`route already exists. path: "${data.path}"`);
             }
         }
 
@@ -407,7 +404,7 @@ class Router<T extends any[]> {
 
     addMount(data: MountOptions, ...middleware: (Callback<T> | Router<T>)[] | [(Callback<T> | Router<T>)[]]) {
         if(data.path === null || typeof data.path !== 'string') {
-            throw new Error('no path given for route');
+            throw new RouterError('no path given for route');
         }
 
         let type = RouteTypes.MOUNT;
@@ -420,7 +417,7 @@ class Router<T extends any[]> {
         }
 
         if (r) {
-            throw new Error("mount already exists");
+            throw new RouterError("mount already exists");
         }
         
         data.options = {...data.options,end:false};
@@ -431,7 +428,7 @@ class Router<T extends any[]> {
         let router = middleware[middleware.length - 1];
 
         if (!(router instanceof Router)) {
-            throw new Error("mount point must be an instance of Router");
+            throw new RouterError("mount point must be an instance of Router");
         }
 
         this.children.push(router);

@@ -7,3 +7,4 @@ export {
 } from "./Router";
 export {default as RoutingData} from "./RoutingData"
 export {default as GlobalRouter} from "./GlobalRouter";
+export {default as RouterError} from "./error/RouterError"
